@@ -212,7 +212,7 @@ public class TeleopBioBuzz extends OpMode {
         double distance = Math.hypot(currentX, currentY);
 
         double driveGain = 0.001;
-        double turnGain = 0.4;
+        double turnGain = 0.5;
 
         double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentX * driveGain)) : 0.0;
         double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentY * driveGain)) : 0.0;
