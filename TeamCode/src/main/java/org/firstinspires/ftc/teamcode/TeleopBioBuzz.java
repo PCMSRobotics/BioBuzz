@@ -24,7 +24,7 @@ public class TeleopBioBuzz extends OpMode {
     final double STOP_SPEED = 0.0;
     final double FULL_SPEED = 1.0;
 
-    final double LAUNCHER_TARGET_VELOCITY = 1125;
+    final double LAUNCHER_TARGET_VELOCITY = 1126;
     final double LAUNCHER_TARGET_VELOCITY_LONGSHOT = 1444.1;
     final double LAUNCHER_MIN_VELOCITY = 1075;
     final double LAUNCHER_MIN_VELOCITY_LONGSHOT = 1400.7;
