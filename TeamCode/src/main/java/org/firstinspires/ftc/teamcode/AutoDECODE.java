@@ -25,8 +25,8 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Autonomous(name = "AutoBioBuzz", group = "Autonomous")
-public class AutoBioBuzz extends LinearOpMode {
+@Autonomous(name = "AutoDECODE", group = "Autonomous")
+public class AutoDECODE extends LinearOpMode {
 
     // Hardware
     private DcMotor leftBackDrive;

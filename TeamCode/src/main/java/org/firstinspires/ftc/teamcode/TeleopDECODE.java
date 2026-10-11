@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import static com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior.BRAKE;
-import com.qualcomm.robotcore.hardware.Servo;
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -9,10 +9,11 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-@TeleOp(name = "TeleopBioBuzz", group = "StarterBot")
-public class TeleopBioBuzz extends OpMode {
+@TeleOp(name = "TeleopDECODE", group = "StarterBot")
+public class TeleopDECODE extends OpMode {
     final double FEED_TIME_SECONDS = 0.10;
     final double STOP_SPEED = 0.0;
     final double FULL_SPEED = 1.0;
