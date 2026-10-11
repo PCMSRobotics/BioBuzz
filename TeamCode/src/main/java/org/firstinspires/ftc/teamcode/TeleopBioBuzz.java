@@ -100,7 +100,7 @@ public class TeleopBioBuzz extends OpMode {
         flylight = hardwareMap.get(Servo.class, "flylight");
 
         odo = hardwareMap.get(GoBildaPinpointDriver.class, "odometer");
-        odo.setOffsets(-165.0, 52.5, DistanceUnit.MM);
+        odo.setOffsets(-162.0, -120.0, DistanceUnit.MM);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
         odo.resetPosAndIMU();
@@ -138,9 +138,12 @@ public class TeleopBioBuzz extends OpMode {
         if (gamepad1.dpad_down) {
             driveToOrigin();
         } else if (gamepad1.left_trigger_pressed) {
-            mecanumDriveField(-stickLY, stickLX, stickRX);
-        } else {
             mecanumDrive(-stickLY, stickLX, stickRX);
+        } else if (gamepad1.dpad_left){
+            spin();
+        }
+        else {
+            mecanumDriveField(-stickLY, stickLX, stickRX);
         }
 
         if (gamepad1.y) {
@@ -219,6 +222,9 @@ public class TeleopBioBuzz extends OpMode {
         double targetRotate = (Math.abs(currentHeading) > ORIGIN_HEADING_DEADBAND_RAD) ? Math.max(-0.4, Math.min(0.4, -currentHeading * turnGain)) : 0.0;
 
         mecanumDriveField(targetForward, -targetStrafe, -targetRotate);
+    }
+    void spin (){
+        mecanumDriveField(0, 0, .1);
     }
 
     void launch(boolean shotRequested) {
