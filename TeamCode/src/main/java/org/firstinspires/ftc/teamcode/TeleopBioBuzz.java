@@ -141,7 +141,10 @@ public class TeleopBioBuzz extends OpMode {
             mecanumDrive(-stickLY, stickLX, stickRX);
         } else if (gamepad1.dpad_left){
             spin();
+        } else if (gamepad1.dpad_right) {
+            driveToHome();
         }
+
         else {
             mecanumDriveField(-stickLY, stickLX, stickRX);
         }
@@ -207,19 +210,40 @@ public class TeleopBioBuzz extends OpMode {
     }
 
     void driveToOrigin() {
+            Pose2D pos = odo.getPosition();
+            double currentX = pos.getX(DistanceUnit.MM);
+            double currentY = pos.getY(DistanceUnit.MM);
+            double currentHeading = pos.getHeading(AngleUnit.RADIANS);
+
+            double distance = Math.hypot(currentX, currentY);
+
+            double driveGain = 0.001;
+            double turnGain = 0.5;
+
+            double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentX * driveGain)) : 0.0;
+        double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentY * driveGain)) : 0.0;
+        double targetRotate = (Math.abs(currentHeading) > ORIGIN_HEADING_DEADBAND_RAD) ? Math.max(-0.4, Math.min(0.4, -currentHeading * turnGain)) : 0.0;
+
+        mecanumDriveField(targetForward, -targetStrafe, -targetRotate);
+    }
+    void driveToHome() {
         Pose2D pos = odo.getPosition();
+  //      Pose2D pos = new Pose2D(DistanceUnit.MM, 3000,-26, AngleUnit.RADIANS, 0);
         double currentX = pos.getX(DistanceUnit.MM);
         double currentY = pos.getY(DistanceUnit.MM);
-        double currentHeading = pos.getHeading(AngleUnit.RADIANS);
+        double destX = 470;
+        double destY = 1300;
+        double destHead = 0;
+       double currentHeading = pos.getHeading(AngleUnit.RADIANS);
 
-        double distance = Math.hypot(currentX, currentY);
+        double distance = Math.hypot(destX-currentX, destY - currentY);
 
         double driveGain = 0.001;
         double turnGain = 0.5;
 
-        double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentX * driveGain)) : 0.0;
-        double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, -currentY * driveGain)) : 0.0;
-        double targetRotate = (Math.abs(currentHeading) > ORIGIN_HEADING_DEADBAND_RAD) ? Math.max(-0.4, Math.min(0.4, -currentHeading * turnGain)) : 0.0;
+        double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, (destX-currentX) * driveGain)) : destX;
+        double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, (destY-currentY) * driveGain)) : destY;
+        double targetRotate = (Math.abs(currentHeading) > ORIGIN_HEADING_DEADBAND_RAD) ? Math.max(-0.4, Math.min(0.4, (destHead-currentHeading) * turnGain)) : destHead;
 
         mecanumDriveField(targetForward, -targetStrafe, -targetRotate);
     }
