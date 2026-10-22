@@ -29,10 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class AutoBioBuzz extends LinearOpMode {
 
     // Hardware
-    private DcMotor leftBackDrive;
-    private DcMotor rightBackDrive;
-    private DcMotor leftFrontDrive;
-    private DcMotor rightFrontDrive;
+    private BioBuzzDrive drive;
     private DcMotor launcher;
     private CRServo leftFeeder;
     private CRServo rightFeeder;
@@ -115,11 +112,9 @@ public class AutoBioBuzz extends LinearOpMode {
     }
 
     private void initHardware() {
+        drive = new BioBuzzDrive(hardwareMap);
+
         // Motors
-        leftFrontDrive = hardwareMap.get(DcMotor.class, "left_front_drive");
-        leftBackDrive = hardwareMap.get(DcMotor.class, "left_back_drive");
-        rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
-        rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
         launcher = hardwareMap.get(DcMotor.class, "launcher");
 
         // Servos
@@ -130,19 +125,7 @@ public class AutoBioBuzz extends LinearOpMode {
         distance = hardwareMap.get(DistanceSensor.class, "distance");
         imu = hardwareMap.get(IMU.class, "imu");
 
-        // Motor directions
-        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
-
-        // Zero power behaviors
-        leftFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        resetEncoders();
+        drive.resetEncoders();
 
         // IMU Configuration
         IMU.Parameters imuParameters = new IMU.Parameters(
@@ -211,19 +194,19 @@ public class AutoBioBuzz extends LinearOpMode {
                     yPower = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED);
 
                     if (rangeError <= DESIRED_DISTANCE_INCHES && Math.abs(headingError) < 5 && Math.abs(yawError) < 5) {
-                        resetEncoders();
+                        drive.resetEncoders();
                         transitionTo(State.DRIVE_TO_TARGET_2);
                     }
                 } else {
                     xPower = 0; yPower = 0; rxPower = 0;
-                    resetEncoders();
+                    drive.resetEncoders();
                     transitionTo(State.DRIVE_TO_TARGET_2);
                 }
                 break;
 
             case DRIVE_TO_TARGET_2:
                 xPower = 0; yPower = driveSpeed; rxPower = 0;
-                if (rightFrontDrive.getCurrentPosition() >= 15 * COUNTS_PER_10_CM) {
+                if (drive.getRightFrontDrive().getCurrentPosition() >= 15 * COUNTS_PER_10_CM) {
                     transitionTo(State.PREP);
                 }
                 break;
@@ -245,7 +228,7 @@ public class AutoBioBuzz extends LinearOpMode {
             case TURN_RIGHT:
                 xPower = 0; yPower = 0; rxPower = driveSpeed;
                 if (orientation.getYaw(AngleUnit.DEGREES) <= -35) {
-                    resetEncoders();
+                    drive.resetEncoders();
                     transitionTo(State.STOP);
                 }
                 break;
@@ -253,7 +236,7 @@ public class AutoBioBuzz extends LinearOpMode {
             case TURN_LEFT:
                 xPower = 0; yPower = 0; rxPower = -driveSpeed;
                 if (orientation.getYaw(AngleUnit.DEGREES) >= 40) {
-                    resetEncoders();
+                    drive.resetEncoders();
                     transitionTo(State.STOP);
                 }
                 break;
@@ -266,7 +249,7 @@ public class AutoBioBuzz extends LinearOpMode {
             case DRIVE_TO_TARGET_3:
                 driveSpeed = 0.4;
                 xPower = 0; yPower = -driveSpeed; rxPower = 0;
-                if (rightFrontDrive.getCurrentPosition() <= -40.67 * COUNTS_PER_10_CM) {
+                if (drive.getRightFrontDrive().getCurrentPosition() <= -40.67 * COUNTS_PER_10_CM) {
                     transitionTo(State.STOP);
                 }
                 break;
@@ -302,7 +285,7 @@ public class AutoBioBuzz extends LinearOpMode {
             if (t > 0.1) { setFeeders(0, 0); shootStep = 5; stateTimer.reset(); }
         } else if (shootStep == 5) {
             if (t > 1.0) {
-                resetEncoders();
+                drive.resetEncoders();
                 transitionTo(State.IDLE);
             }
         }
@@ -325,24 +308,9 @@ public class AutoBioBuzz extends LinearOpMode {
     }
 
     private void applyDrivePowers() {
-        leftFrontDrive.setPower(yPower + xPower + rxPower);
-        leftBackDrive.setPower((yPower - xPower) + rxPower);
-        rightFrontDrive.setPower((yPower - xPower) - rxPower);
-        rightBackDrive.setPower((yPower + xPower) - rxPower);
+        drive.drive(yPower, xPower, rxPower);
 
         orientation = imu.getRobotYawPitchRollAngles();
-    }
-
-    private void resetEncoders() {
-        leftBackDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightBackDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
-        leftFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        leftBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rightFrontDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rightBackDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
     private void setManualExposure(int exposureMs, int gain) {
@@ -372,7 +340,7 @@ public class AutoBioBuzz extends LinearOpMode {
     private void updateTelemetryData() {
         telemetry.addData("State", currentState);
         telemetry.addData("Drive Powers (X, Y, RX)", "%.2f, %.2f, %.2f", xPower, yPower, rxPower);
-        telemetry.addData("Encoders (LB : RB)", "%d : %d", leftBackDrive.getCurrentPosition(), rightBackDrive.getCurrentPosition());
+        telemetry.addData("Encoders (LB : RB)", "%d : %d", drive.getLeftBackDrive().getCurrentPosition(), drive.getRightBackDrive().getCurrentPosition());
         telemetry.addData("Heading (Yaw)", "%.2f Deg", orientation.getYaw(AngleUnit.DEGREES));
         telemetry.addData("Target Found ID", targetFoundId);
         telemetry.addData("Range Error", "%.2f in", rangeError);
