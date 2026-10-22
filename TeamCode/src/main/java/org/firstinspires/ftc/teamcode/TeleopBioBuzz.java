@@ -32,6 +32,14 @@ public class TeleopBioBuzz extends OpMode {
     final double ORIGIN_DEADBAND_MM = 10.0; // Distance tolerance in mm for returning to origin
     final double ORIGIN_HEADING_DEADBAND_RAD = Math.toRadians(3.0); // Heading tolerance
 
+    final double PARKING_X = 614;
+    final double PARKING_Y = 23;
+    final double PARKING_HEAD = 0;
+
+    final double SHOOTING_X = 470;
+    final double SHOOTING_Y = 1300;
+    final double SHOOTING_HEAD = 0;
+
     // Declare OpMode members.
     private DcMotor leftFrontDrive = null;
     private DcMotor rightFrontDrive = null;
@@ -136,13 +144,16 @@ public class TeleopBioBuzz extends OpMode {
         stickRX = (Math.abs(gamepad1.right_stick_x) < DEADBAND) ? 0 : gamepad1.right_stick_x;
 
         if (gamepad1.dpad_down) {
-            driveToOrigin();
+            driveToLocation(0,0,0);
         } else if (gamepad1.left_trigger_pressed) {
             mecanumDrive(-stickLY, stickLX, stickRX);
-        } else if (gamepad1.dpad_left){
-            spin();
+
+        } else if (gamepad1.dpad_up) {
+            driveToLocation(SHOOTING_X,SHOOTING_Y, SHOOTING_HEAD);
         } else if (gamepad1.dpad_right) {
-            driveToHome();
+            driveToLocation(PARKING_X, PARKING_Y, PARKING_HEAD);
+        }  else if (gamepad1.dpad_left) {
+                driveToLocation(2751,1306,180);
         }
 
         else {
@@ -226,14 +237,11 @@ public class TeleopBioBuzz extends OpMode {
 
         mecanumDriveField(targetForward, -targetStrafe, -targetRotate);
     }
-    void driveToHome() {
+    void driveToLocation(double destX, double destY, double destHead) {
         Pose2D pos = odo.getPosition();
   //      Pose2D pos = new Pose2D(DistanceUnit.MM, 3000,-26, AngleUnit.RADIANS, 0);
         double currentX = pos.getX(DistanceUnit.MM);
         double currentY = pos.getY(DistanceUnit.MM);
-        double destX = 470;
-        double destY = 1300;
-        double destHead = 0;
        double currentHeading = pos.getHeading(AngleUnit.RADIANS);
 
         double distance = Math.hypot(destX-currentX, destY - currentY);
@@ -241,8 +249,8 @@ public class TeleopBioBuzz extends OpMode {
         double driveGain = 0.001;
         double turnGain = 0.5;
 
-        double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, (destX-currentX) * driveGain)) : destX;
-        double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-0.5, Math.min(0.5, (destY-currentY) * driveGain)) : destY;
+        double targetForward = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-2, Math.min(1, (destX-currentX) * driveGain)) : destX;
+        double targetStrafe = (distance > ORIGIN_DEADBAND_MM) ? Math.max(-2, Math.min(1, (destY-currentY) * driveGain)) : destY;
         double targetRotate = (Math.abs(currentHeading) > ORIGIN_HEADING_DEADBAND_RAD) ? Math.max(-0.4, Math.min(0.4, (destHead-currentHeading) * turnGain)) : destHead;
 
         mecanumDriveField(targetForward, -targetStrafe, -targetRotate);
