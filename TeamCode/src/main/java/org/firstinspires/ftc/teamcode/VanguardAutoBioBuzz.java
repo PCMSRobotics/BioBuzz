@@ -21,7 +21,7 @@ import java.util.Map;
  * Autonomous OpMode for BioBuzz Season.
  * Demonstrates a simple state machine for autonomous driving and launcher operation.
  */
-@Autonomous(name = "AutoBioBuzz", group = "Autonomous")
+@Autonomous(name = "VanguardAutoBioBuzz", group = "Autonomous")
 public class VanguardAutoBioBuzz extends LinearOpMode {
 
     // --- Target Locations Map ---
@@ -35,8 +35,11 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
     // Map variable defined in Constants area for autonomous target positions
     final Map<String, Pose2D> TARGET_MAP = new HashMap<String, Pose2D>() {{
-        put("SHOOTING", new Pose2D(DistanceUnit.MM, SHOOTING_X, SHOOTING_Y, AngleUnit.DEGREES, SHOOTING_HEAD));
-        put("PARKING", new Pose2D(DistanceUnit.MM, PARKING_X, PARKING_Y, AngleUnit.DEGREES, PARKING_HEAD));
+        put("SHOOTING1", new Pose2D(DistanceUnit.MM, 0, 0, AngleUnit.DEGREES, 0));
+        put("SHOOTING2", new Pose2D(DistanceUnit.MM, 2646, -49, AngleUnit.DEGREES, 178));
+        put("PRE_PICKUP", new Pose2D(DistanceUnit.MM, 21, 692, AngleUnit.DEGREES, 87));
+        put("PICKUP", new Pose2D(DistanceUnit.MM, 50, 1267, AngleUnit.DEGREES, 88));
+        put("PARKING", new Pose2D(DistanceUnit.MM, 2855, 1187, AngleUnit.DEGREES, 177));
     }};
 
     // Motor & Servo Speed Constants
@@ -54,9 +57,17 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
     // State Machine Variables
     private enum State {
         IDLE,
-        DRIVE_TO_TARGET,
-        PREP,
-        SHOOT,
+        DRIVE_TO_SHOOTING1,
+        DRIVE_TO_SHOOTING2,
+        DRIVE_TO_SHOOTING1_2,
+        DRIVE_TO_SHOOTING2_2,
+        DRIVE_TO_PRE_PRE_PICKUP,
+        DRIVE_TO_PRE_PICKUP,
+        DRIVE_TO_PICKUP,
+        DRIVE_TO_PARKING,
+        SHOOT1,
+        SHOOT2,
+        SHOOT3,
         STOP
     }
 
@@ -79,7 +90,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
         waitForStart();
 
         stateTimer.reset();
-        transitionTo(State.DRIVE_TO_TARGET);
+        transitionTo(State.DRIVE_TO_SHOOTING1);
 
         while (opModeIsActive()) {
             double newTime = getRuntime();
@@ -116,25 +127,95 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
                 stopFeedersAndLauncher();
                 break;
 
-            case DRIVE_TO_TARGET:
+            case DRIVE_TO_SHOOTING1:
                 // Use driveToLocation with the target location map from Constants area
-                Pose2D targetPose = TARGET_MAP.get("SHOOTING");
-                if (drive.driveToLocation(targetPose)) {
-                    transitionTo(State.PREP);
+                if (drive.driveToLocation(TARGET_MAP.get("SHOOTING1"))) {
+                    transitionTo(State.SHOOT1);
+                }
+                break;
+            case DRIVE_TO_SHOOTING2:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("SHOOTING2"))) {
+                    transitionTo(State.SHOOT2);
                 }
                 break;
 
-            case PREP:
+            case DRIVE_TO_SHOOTING1_2:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("SHOOTING1"))) {
+                    transitionTo(State.DRIVE_TO_SHOOTING2_2);
+                }
+                break;
+
+            case DRIVE_TO_SHOOTING2_2:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("SHOOTING2"))) {
+                    transitionTo(State.SHOOT3);
+                }
+                break;
+
+            case DRIVE_TO_PRE_PRE_PICKUP:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("SHOOTING1"))) {
+                    transitionTo(State.DRIVE_TO_PRE_PICKUP);
+                }
+                break;
+
+            case DRIVE_TO_PRE_PICKUP:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
+                    transitionTo(State.DRIVE_TO_PICKUP);
+                }
+                break;
+            case DRIVE_TO_PICKUP:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("PICKUP"))) {
+                    transitionTo(State.DRIVE_TO_SHOOTING1_2);
+                }
+                break;
+            case DRIVE_TO_PARKING:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("PARKING"))) {
+                    transitionTo(State.STOP);
+                }
+                break;
+            //           case PREP:
+//                launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
+            //             if (stateTimer.seconds() >= 2.0) {
+            //                  shootStep = 0;
+            //                   transitionTo(State.SHOOT1);
+//                }
+            //               break;
+
+            case SHOOT1:
                 launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
                 if (stateTimer.seconds() >= 2.0) {
+                    runShootingSequence();
                     shootStep = 0;
-                    transitionTo(State.SHOOT);
                 }
+                transitionTo(State.DRIVE_TO_SHOOTING2);
                 break;
 
-            case SHOOT:
-                runShootingSequence();
+            case SHOOT2:
+                launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
+                if (stateTimer.seconds() >= 2.0) {
+                    runShootingSequence();
+                    shootStep = 0;
+                }
+                transitionTo(State.DRIVE_TO_PRE_PRE_PICKUP);
+
                 break;
+
+            case SHOOT3:
+                launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
+                if (stateTimer.seconds() >= 2.0) {
+                    runShootingSequence();
+                    shootStep = 0;
+                }
+                transitionTo(State.DRIVE_TO_PARKING);
+
+                break;
+
 
             case STOP:
             default:
@@ -200,7 +281,6 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
             telemetry.addData("Position", posData);
             telemetry.addData("Velocity", velData);
             telemetry.addData("Distance to Origin", String.format(Locale.US, "%.1f mm", Math.hypot(pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM))));
-            telemetry.addData("Drive to Target", (currentState == State.DRIVE_TO_TARGET) ? "ACTIVE (SHOOTING Target)" : "Inactive");
             telemetry.addData("Pinpoint Status", odo.getDeviceStatus());
             telemetry.addData("Pinpoint Frequency", odo.getFrequency());
         }
