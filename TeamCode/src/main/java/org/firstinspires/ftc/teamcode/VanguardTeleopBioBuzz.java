@@ -12,28 +12,42 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-@TeleOp(name = "TeleopDECODE", group = "StarterBot")
-public class TeleopDECODE extends OpMode {
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit;
+
+import java.util.Locale;
+
+@TeleOp(name = "TeleopBioBuzz", group = "StarterBot")
+public class VanguardTeleopBioBuzz extends OpMode {
     final double FEED_TIME_SECONDS = 0.10;
     final double STOP_SPEED = 0.0;
     final double FULL_SPEED = 1.0;
 
-    final double LAUNCHER_TARGET_VELOCITY = 1125;
+    final double LAUNCHER_TARGET_VELOCITY = 1126;
     final double LAUNCHER_TARGET_VELOCITY_LONGSHOT = 1444.1;
     final double LAUNCHER_MIN_VELOCITY = 1075;
     final double LAUNCHER_MIN_VELOCITY_LONGSHOT = 1400.7;
+    final double DEADBAND = 0.1;
+
+    final double PARKING_X = 614;
+    final double PARKING_Y = 23;
+    final double PARKING_HEAD = 0;
+
+    final double SHOOTING_X = 470;
+    final double SHOOTING_Y = 1300;
+    final double SHOOTING_HEAD = 0;
 
     // Declare OpMode members.
-    private DcMotor leftFrontDrive = null;
-    private DcMotor rightFrontDrive = null;
-    private DcMotor leftBackDrive = null;
-    private DcMotor rightBackDrive = null;
+    private PCMSRoboticsDrive drive;
     private DcMotorEx launcher = null;
     private CRServo leftFeeder = null;
     private CRServo rightFeeder = null;
     private Servo flylight = null;
 
     ElapsedTime feederTimer = new ElapsedTime();
+    double oldTime = 0;
 
     private enum LaunchState {
         IDLE,
@@ -44,14 +58,9 @@ public class TeleopDECODE extends OpMode {
 
     private LaunchState launchState;
 
-    // Drive wheel and state variables
-    double leftFrontPower;
-    double rightFrontPower;
-    double leftBackPower;
-    double rightBackPower;
     boolean isLongShot = false;
 
-    // --- NEW TELEMETRY VARIABLES ---
+    // --- TELEMETRY VARIABLES ---
     double lastLaunchVelocity = 0.0;
     int launchCount = 0;
 
@@ -59,25 +68,12 @@ public class TeleopDECODE extends OpMode {
     public void init() {
         launchState = LaunchState.IDLE;
 
-        leftFrontDrive = hardwareMap.get(DcMotor.class, "left_front_drive");
-        rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
-        leftBackDrive = hardwareMap.get(DcMotor.class, "left_back_drive");
-        rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
+        drive = new VanguardDrive(hardwareMap);
         launcher = hardwareMap.get(DcMotorEx.class, "launcher");
         leftFeeder = hardwareMap.get(CRServo.class, "left_feeder");
         rightFeeder = hardwareMap.get(CRServo.class, "right_feeder");
 
-        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
-
         launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-        leftFrontDrive.setZeroPowerBehavior(BRAKE);
-        rightFrontDrive.setZeroPowerBehavior(BRAKE);
-        leftBackDrive.setZeroPowerBehavior(BRAKE);
-        rightBackDrive.setZeroPowerBehavior(BRAKE);
         launcher.setZeroPowerBehavior(BRAKE);
 
         leftFeeder.setPower(STOP_SPEED);
@@ -92,14 +88,45 @@ public class TeleopDECODE extends OpMode {
     }
 
     @Override
-    public void init_loop() {}
+    public void init_loop() {
+    }
 
     @Override
-    public void start() {}
+    public void start() {
+    }
 
     @Override
     public void loop() {
-        mecanumDrive(-gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
+        float stickLX, stickLY, stickRX;
+        drive.update();
+
+        if (gamepad1.a) {
+            drive.resetPosAndIMU();
+        }
+
+        double newTime = getRuntime();
+        double loopTime = newTime - oldTime;
+        double frequency = (loopTime > 0) ? (1 / loopTime) : 0;
+        oldTime = newTime;
+
+        // Implement a deadband area for stick centering
+        stickLX = (Math.abs(gamepad1.left_stick_x) < DEADBAND) ? 0 : gamepad1.left_stick_x;
+        stickLY = (Math.abs(gamepad1.left_stick_y) < DEADBAND) ? 0 : gamepad1.left_stick_y;
+        stickRX = (Math.abs(gamepad1.right_stick_x) < DEADBAND) ? 0 : gamepad1.right_stick_x;
+
+        if (gamepad1.dpad_down) {
+            drive.driveToLocation(0, 0, 0);
+        } else if (gamepad1.left_trigger_pressed) {
+            drive.mecanumDrive(-stickLY, stickLX, stickRX);
+        } else if (gamepad1.dpad_up) {
+            drive.driveToLocation(SHOOTING_X, SHOOTING_Y, SHOOTING_HEAD);
+        } else if (gamepad1.dpad_right) {
+            drive.driveToLocation(PARKING_X, PARKING_Y, PARKING_HEAD);
+        } else if (gamepad1.dpad_left) {
+            drive.driveToLocation(2751, 1306, 180);
+        } else {
+            drive.mecanumDriveField(-stickLY, stickLX, stickRX);
+        }
 
         if (gamepad1.y) {
             isLongShot = false;
@@ -116,7 +143,21 @@ public class TeleopDECODE extends OpMode {
 
         launch(gamepad1.rightBumperWasPressed());
 
-        // --- UPDATED TELEMETRY SECTION ---
+        // --- TELEMETRY SECTION ---
+        GoBildaPinpointDriver odo = drive.getOdo();
+        if (odo != null) {
+            Pose2D pos = odo.getPosition();
+            String posData = String.format(Locale.US, "{X: %.3f, Y: %.3f, H: %.3f}", pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM), pos.getHeading(AngleUnit.DEGREES));
+            String velData = String.format(Locale.US, "{XVel: %.3f, YVel: %.3f, HVel: %.3f}", odo.getVelX(DistanceUnit.MM), odo.getVelY(DistanceUnit.MM), odo.getHeadingVelocity(UnnormalizedAngleUnit.DEGREES));
+
+            telemetry.addData("Position", posData);
+            telemetry.addData("Velocity", velData);
+            telemetry.addData("Distance to Origin", String.format(Locale.US, "%.1f mm", Math.hypot(pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM))));
+            telemetry.addData("Drive to Origin", gamepad1.dpad_down ? "ACTIVE (Dpad Down)" : "Inactive");
+            telemetry.addData("Pinpoint Status", odo.getDeviceStatus());
+            telemetry.addData("Pinpoint Frequency", odo.getFrequency());
+        }
+        telemetry.addData("REV Hub Frequency", frequency);
         telemetry.addData("State", launchState);
         telemetry.addData("Current Velocity", launcher.getVelocity());
         telemetry.addData("Last Launch Velocity", lastLaunchVelocity);
@@ -125,20 +166,11 @@ public class TeleopDECODE extends OpMode {
     }
 
     @Override
-    public void stop() {}
+    public void stop() {
+    }
 
-    void mecanumDrive(double forward, double strafe, double rotate){
-        double denominator = Math.max(Math.abs(forward) + Math.abs(strafe) + Math.abs(rotate), 1);
-
-        leftFrontPower = (forward + strafe + rotate) / denominator;
-        rightFrontPower = (forward - strafe - rotate) / denominator;
-        leftBackPower = (forward - strafe + rotate) / denominator;
-        rightBackPower = (forward + strafe - rotate) / denominator;
-
-        leftFrontDrive.setPower(leftFrontPower);
-        rightFrontDrive.setPower(rightFrontPower);
-        leftBackDrive.setPower(leftBackPower);
-        rightBackDrive.setPower(rightBackPower);
+    void spin() {
+        drive.mecanumDriveField(0, 0, .1);
     }
 
     void launch(boolean shotRequested) {
@@ -152,17 +184,16 @@ public class TeleopDECODE extends OpMode {
                 if (!isLongShot) {
                     launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
                     if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
-                          launchState = LaunchState.LAUNCH;
+                        launchState = LaunchState.LAUNCH;
                     }
                 } else {
                     launcher.setVelocity(LAUNCHER_TARGET_VELOCITY_LONGSHOT);
                     if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY_LONGSHOT) {
-                          launchState = LaunchState.LAUNCH;
+                        launchState = LaunchState.LAUNCH;
                     }
                 }
                 break;
             case LAUNCH:
-                // --- RECORD DATA HERE ---
                 lastLaunchVelocity = launcher.getVelocity();
                 launchCount++;
 
