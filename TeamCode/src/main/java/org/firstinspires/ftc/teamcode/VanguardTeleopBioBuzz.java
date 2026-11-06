@@ -42,8 +42,6 @@ public class VanguardTeleopBioBuzz extends OpMode {
     // Declare OpMode members.
     private PCMSRoboticsDrive drive;
     private DcMotorEx launcher = null;
-    private CRServo leftFeeder = null;
-    private CRServo rightFeeder = null;
     private Servo flylight = null;
 
     ElapsedTime feederTimer = new ElapsedTime();
@@ -70,19 +68,14 @@ public class VanguardTeleopBioBuzz extends OpMode {
 
         drive = new VanguardDrive(hardwareMap);
         launcher = hardwareMap.get(DcMotorEx.class, "launcher");
-        leftFeeder = hardwareMap.get(CRServo.class, "left_feeder");
-        rightFeeder = hardwareMap.get(CRServo.class, "right_feeder");
 
         launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         launcher.setZeroPowerBehavior(BRAKE);
-
-        leftFeeder.setPower(STOP_SPEED);
-        rightFeeder.setPower(STOP_SPEED);
+        launcher.setZeroPowerBehavior(BRAKE);
 
         launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(300, 0, 0, 10));
 
-        leftFeeder.setDirection(DcMotorSimple.Direction.REVERSE);
-        flylight = hardwareMap.get(Servo.class, "flylight");
+//        flylight = hardwareMap.get(Servo.class, "flylight");
 
         telemetry.addData("Status", "Initialized");
     }
@@ -131,13 +124,13 @@ public class VanguardTeleopBioBuzz extends OpMode {
         if (gamepad1.y) {
             isLongShot = false;
             launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-            flylight.setPosition(0.3);
+            //  flylight.setPosition(0.3);
         } else if (gamepad1.b) {
             launcher.setVelocity(STOP_SPEED);
-            flylight.setPosition(0.5);
+            //  flylight.setPosition(0.5);
         } else if (gamepad1.x) {
             isLongShot = true;
-            flylight.setPosition(0.3);
+            //  flylight.setPosition(0.3);
             launcher.setVelocity(LAUNCHER_TARGET_VELOCITY_LONGSHOT);
         }
 
@@ -194,19 +187,12 @@ public class VanguardTeleopBioBuzz extends OpMode {
                 }
                 break;
             case LAUNCH:
-                lastLaunchVelocity = launcher.getVelocity();
-                launchCount++;
-
-                leftFeeder.setPower(FULL_SPEED);
-                rightFeeder.setPower(FULL_SPEED);
                 feederTimer.reset();
                 launchState = LaunchState.LAUNCHING;
                 break;
             case LAUNCHING:
                 if (feederTimer.seconds() > FEED_TIME_SECONDS) {
                     launchState = LaunchState.IDLE;
-                    leftFeeder.setPower(STOP_SPEED);
-                    rightFeeder.setPower(STOP_SPEED);
                 }
                 break;
         }
