@@ -29,9 +29,9 @@ public class VanguardDrive extends PCMSRoboticsDrive {
     protected void initOdometer(HardwareMap hardwareMap) {
         super.initOdometer(hardwareMap);
         // Custom odometry offsets or pod directions for the Vanguard robot can be configured here
-        odo.setOffsets(-162.0, -120.0, DistanceUnit.MM);
+        odo.setOffsets(-190.5, -38.1, DistanceUnit.MM);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.FORWARD);
         odo.resetPosAndIMU();
     }
-}
+}// y=-3.81cm x=-19.05

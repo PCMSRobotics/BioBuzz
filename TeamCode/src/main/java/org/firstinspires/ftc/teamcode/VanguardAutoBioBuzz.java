@@ -36,23 +36,27 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
     // Map variable defined in Constants area for autonomous target positions
     final Map<String, Pose2D> TARGET_MAP = new HashMap<String, Pose2D>() {{
         put("SHOOTING1", new Pose2D(DistanceUnit.MM, 0, 0, AngleUnit.DEGREES, 0));
-        put("SHOOTING2", new Pose2D(DistanceUnit.MM, 2646, -49, AngleUnit.DEGREES, 178));
-        put("PRE_PICKUP", new Pose2D(DistanceUnit.MM, 21, 692, AngleUnit.DEGREES, 87));
-        put("PICKUP", new Pose2D(DistanceUnit.MM, 50, 1267, AngleUnit.DEGREES, 88));
-        put("PARKING", new Pose2D(DistanceUnit.MM, 2855, 1187, AngleUnit.DEGREES, 177));
+        put("SHOOTING2", new Pose2D(DistanceUnit.MM, -2980, 233, AngleUnit.DEGREES, -179));
+        put("PRE_PICKUP", new Pose2D(DistanceUnit.MM, -60, 150, AngleUnit.DEGREES, -90));
+        put("PICKUP", new Pose2D(DistanceUnit.MM, -90, -1140, AngleUnit.DEGREES, -90));
+        put("PARKING", new Pose2D(DistanceUnit.MM, -2011, -926, AngleUnit.DEGREES, -179));
     }};
 
     // Motor & Servo Speed Constants
-    final double LAUNCHER_TARGET_VELOCITY = 1126;
+    final double LAUNCHER_TARGET_VELOCITY = 1250;
+    final double LAUNCHER_MIN_VELOCITY = 1200;
     final double FEED_TIME_SECONDS = 0.10;
     final double STOP_SPEED = 0.0;
     final double FULL_SPEED = 1.0;
+    double intakePower;
 
     // Hardware Members
     private PCMSRoboticsDrive drive;
     private DcMotorEx launcher = null;
-    private CRServo leftFeeder = null;
-    private CRServo rightFeeder = null;
+    private DcMotor intake = null;
+    private CRServo rightintakeservo = null;
+    private CRServo leftintakeservo = null;
+    private CRServo windmillservo = null;
 
     // State Machine Variables
     private enum State {
@@ -64,6 +68,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
         DRIVE_TO_PRE_PRE_PICKUP,
         DRIVE_TO_PRE_PICKUP,
         DRIVE_TO_PICKUP,
+        DRIVE_TO_PRE_PARKING,
         DRIVE_TO_PARKING,
         SHOOT1,
         SHOOT2,
@@ -71,7 +76,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
         STOP
     }
 
-    private State currentState = State.IDLE;
+    private State currentState = State.SHOOT1;
     private final ElapsedTime stateTimer = new ElapsedTime();
     private int shootStep = 0;
 
@@ -79,6 +84,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
     private double oldTime = 0.0;
     private double lastLaunchVelocity = 0.0;
     private int launchCount = 0;
+
 
     @Override
     public void runOpMode() {
@@ -110,15 +116,17 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
         drive = new VanguardDrive(hardwareMap);
 
         launcher = hardwareMap.get(DcMotorEx.class, "launcher");
-        leftFeeder = hardwareMap.get(CRServo.class, "left_feeder");
-        rightFeeder = hardwareMap.get(CRServo.class, "right_feeder");
+        leftintakeservo = hardwareMap.get(CRServo.class, "left_intake_servo");
+        rightintakeservo = hardwareMap.get(CRServo.class, "right_intake_servo");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        windmillservo = hardwareMap.get(CRServo.class, "windmillServo");
 
         launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        leftFeeder.setPower(STOP_SPEED);
-        rightFeeder.setPower(STOP_SPEED);
-        leftFeeder.setDirection(DcMotorSimple.Direction.REVERSE);
+        leftintakeservo.setPower(STOP_SPEED);
+        rightintakeservo.setPower(STOP_SPEED);
+        leftintakeservo.setDirection(DcMotorSimple.Direction.REVERSE);
     }
 
     private void updateStateLogic() {
@@ -149,12 +157,14 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
             case DRIVE_TO_SHOOTING2_2:
                 // Use driveToLocation with the target location map from Constants area
+                launcher.setVelocity(0);
                 if (drive.driveToLocation(TARGET_MAP.get("SHOOTING2"))) {
                     transitionTo(State.SHOOT3);
                 }
                 break;
 
             case DRIVE_TO_PRE_PRE_PICKUP:
+                launcher.setVelocity(0);
                 // Use driveToLocation with the target location map from Constants area
                 if (drive.driveToLocation(TARGET_MAP.get("SHOOTING1"))) {
                     transitionTo(State.DRIVE_TO_PRE_PICKUP);
@@ -163,13 +173,28 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
             case DRIVE_TO_PRE_PICKUP:
                 // Use driveToLocation with the target location map from Constants area
+                launcher.setVelocity(0);
                 if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
+                    intake.setPower(intakePower);
+                    rightintakeservo.setPower(intakePower);
+                    leftintakeservo.setPower(intakePower);
                     transitionTo(State.DRIVE_TO_PICKUP);
                 }
                 break;
+
+            case DRIVE_TO_PRE_PARKING:
+                // Use driveToLocation with the target location map from Constants area
+                if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
+                    transitionTo(State.DRIVE_TO_PARKING);
+                }
+                break;
             case DRIVE_TO_PICKUP:
+
                 // Use driveToLocation with the target location map from Constants area
                 if (drive.driveToLocation(TARGET_MAP.get("PICKUP"))) {
+                    intake.setPower(intakePower);
+                    rightintakeservo.setPower(intakePower);
+                    leftintakeservo.setPower(intakePower);
                     transitionTo(State.DRIVE_TO_SHOOTING1_2);
                 }
                 break;
@@ -189,18 +214,21 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
             case SHOOT1:
                 launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-                if (stateTimer.seconds() >= 2.0) {
+                if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
                     runShootingSequence();
-                    shootStep = 0;
+                    launchCount++;
                 }
-                transitionTo(State.DRIVE_TO_SHOOTING2);
+                if (launchCount == 3) {
+                    launchCount = 0;
+                    transitionTo(State.DRIVE_TO_PRE_PICKUP);
+                }
                 break;
 
             case SHOOT2:
                 launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-                if (stateTimer.seconds() >= 2.0) {
+                if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
                     runShootingSequence();
-                    shootStep = 0;
+
                 }
                 transitionTo(State.DRIVE_TO_PRE_PRE_PICKUP);
 
@@ -208,9 +236,9 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
             case SHOOT3:
                 launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-                if (stateTimer.seconds() >= 2.0) {
+                if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
                     runShootingSequence();
-                    shootStep = 0;
+
                 }
                 transitionTo(State.DRIVE_TO_PARKING);
 
@@ -227,36 +255,17 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
     private void runShootingSequence() {
         double t = stateTimer.seconds();
-        if (shootStep == 0) {
-            lastLaunchVelocity = launcher.getVelocity();
-            launchCount++;
-            leftFeeder.setPower(FULL_SPEED);
-            rightFeeder.setPower(FULL_SPEED);
-            if (t > FEED_TIME_SECONDS) {
-                stopFeeders();
-                shootStep = 1;
-                stateTimer.reset();
-            }
-        } else if (shootStep == 1) {
-            if (t > 0.5) {
-                lastLaunchVelocity = launcher.getVelocity();
-                launchCount++;
-                leftFeeder.setPower(FULL_SPEED);
-                rightFeeder.setPower(FULL_SPEED);
-                shootStep = 2;
-                stateTimer.reset();
-            }
-        } else if (shootStep == 2) {
-            if (t > FEED_TIME_SECONDS) {
-                stopFeedersAndLauncher();
-                transitionTo(State.STOP);
-            }
+        if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
+            windmillservo.setPower(-1);
+            intakePower += 0.5;
+        } else {
+            windmillservo.setPower(0);
         }
     }
 
     private void stopFeeders() {
-        leftFeeder.setPower(STOP_SPEED);
-        rightFeeder.setPower(STOP_SPEED);
+        leftintakeservo.setPower(STOP_SPEED);
+        rightintakeservo.setPower(STOP_SPEED);
     }
 
     private void stopFeedersAndLauncher() {
