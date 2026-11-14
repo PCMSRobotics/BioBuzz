@@ -222,8 +222,8 @@ public class BioBuzzStarterbotTeleopMecanum extends OpMode {
          */
 
         intake.setPower(intakePower);
-        leftIntakeServo.setPower(intakePower);
-        rightIntakeServo.setPower(intakePower);
+        leftIntakeServo.setPower(-intakePower);
+        rightIntakeServo.setPower(-intakePower);
 
         /*
          * Show motor powers on the Driver Station via telemetry.

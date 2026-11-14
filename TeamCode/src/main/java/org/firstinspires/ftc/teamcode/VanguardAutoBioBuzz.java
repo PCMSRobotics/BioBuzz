@@ -37,9 +37,10 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
     final Map<String, Pose2D> TARGET_MAP = new HashMap<String, Pose2D>() {{
         put("SHOOTING1", new Pose2D(DistanceUnit.MM, 0, 0, AngleUnit.DEGREES, 0));
         put("SHOOTING2", new Pose2D(DistanceUnit.MM, -2980, 233, AngleUnit.DEGREES, -179));
-        put("PRE_PICKUP", new Pose2D(DistanceUnit.MM, -60, 150, AngleUnit.DEGREES, -90));
-        put("PICKUP", new Pose2D(DistanceUnit.MM, -90, -1140, AngleUnit.DEGREES, -90));
-        put("PARKING", new Pose2D(DistanceUnit.MM, -2011, -926, AngleUnit.DEGREES, -179));
+        put("PRE_PICKUP", new Pose2D(DistanceUnit.MM, -36, -18, AngleUnit.DEGREES, -89));
+        put("PRE_PARKING", new Pose2D(DistanceUnit.MM, -63, -20, AngleUnit.DEGREES, -89));
+        put("PICKUP", new Pose2D(DistanceUnit.MM, 0, -1306, AngleUnit.DEGREES, -89));
+        put("PARKING", new Pose2D(DistanceUnit.MM, -2037, -1280, AngleUnit.DEGREES, -93));
     }};
 
     // Motor & Servo Speed Constants
@@ -174,7 +175,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
             case DRIVE_TO_PRE_PICKUP:
                 // Use driveToLocation with the target location map from Constants area
                 launcher.setVelocity(0);
-                if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
+                if (drive.driveToLocation(TARGET_MAP.get("PRE_PARKING"))) {
                     intake.setPower(intakePower);
                     rightintakeservo.setPower(intakePower);
                     leftintakeservo.setPower(intakePower);
@@ -195,7 +196,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
                     intake.setPower(intakePower);
                     rightintakeservo.setPower(intakePower);
                     leftintakeservo.setPower(intakePower);
-                    transitionTo(State.DRIVE_TO_SHOOTING1_2);
+                    transitionTo(State.DRIVE_TO_PRE_PARKING);
                 }
                 break;
             case DRIVE_TO_PARKING:
@@ -254,10 +255,12 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
     }
 
     private void runShootingSequence() {
-        double t = stateTimer.seconds();
         if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
             windmillservo.setPower(-1);
-            intakePower += 0.5;
+            intake.setPower(.75);
+            while (launcher.getVelocity() >= LAUNCHER_TARGET_VELOCITY) {
+                sleep(1);
+            }
         } else {
             windmillservo.setPower(0);
         }
