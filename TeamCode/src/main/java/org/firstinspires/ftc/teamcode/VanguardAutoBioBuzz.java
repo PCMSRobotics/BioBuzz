@@ -97,7 +97,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
         waitForStart();
 
         stateTimer.reset();
-        transitionTo(State.DRIVE_TO_SHOOTING1);
+        transitionTo(State.DRIVE_TO_PARKING);
 
         while (opModeIsActive()) {
             double newTime = getRuntime();
@@ -175,7 +175,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
             case DRIVE_TO_PRE_PICKUP:
                 // Use driveToLocation with the target location map from Constants area
                 launcher.setVelocity(0);
-                if (drive.driveToLocation(TARGET_MAP.get("PRE_PARKING"))) {
+                if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
                     intake.setPower(intakePower);
                     rightintakeservo.setPower(intakePower);
                     leftintakeservo.setPower(intakePower);
@@ -185,7 +185,7 @@ public class VanguardAutoBioBuzz extends LinearOpMode {
 
             case DRIVE_TO_PRE_PARKING:
                 // Use driveToLocation with the target location map from Constants area
-                if (drive.driveToLocation(TARGET_MAP.get("PRE_PICKUP"))) {
+                if (drive.driveToLocation(TARGET_MAP.get("PRE_PARKING"))) {
                     transitionTo(State.DRIVE_TO_PARKING);
                 }
                 break;

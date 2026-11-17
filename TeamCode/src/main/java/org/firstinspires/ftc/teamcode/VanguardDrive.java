@@ -35,4 +35,4 @@ public class VanguardDrive extends PCMSRoboticsDrive {
         odo.resetPosAndIMU();
     }
 }// vanarcy y=-3.81cm x=-19.05
-// vangaurd
+// vangaurd y=146 mm x=63.5 mm
