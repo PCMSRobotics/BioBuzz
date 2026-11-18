@@ -9,8 +9,6 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
-import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -19,65 +17,49 @@ import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit
 
 import java.util.Locale;
 
-@TeleOp(name = "TeleopBioBuzz", group = "StarterBot")
+@TeleOp(name = "VanguardTeleopBioBuzz", group = "StarterBot")
 public class VanguardTeleopBioBuzz extends OpMode {
-    final double FEED_TIME_SECONDS = 0.10;
-    final double STOP_SPEED = 0.0;
-    final double FULL_SPEED = 1.0;
 
-    final double LAUNCHER_TARGET_VELOCITY = 1126;
-    final double LAUNCHER_TARGET_VELOCITY_LONGSHOT = 1444.1;
-    final double LAUNCHER_MIN_VELOCITY = 1075;
-    final double LAUNCHER_MIN_VELOCITY_LONGSHOT = 1400.7;
+    // Launcher constants from reference starterbot
+    public final int LAUNCHER_TARGET_VELOCITY = 1300;
+    public final int LAUNCHER_MIN_VELOCITY = 1200;
     final double DEADBAND = 0.1;
-
-    final double PARKING_X = 614;
-    final double PARKING_Y = 23;
-    final double PARKING_HEAD = 0;
-
-    final double SHOOTING_X = 470;
-    final double SHOOTING_Y = 1300;
-    final double SHOOTING_HEAD = 0;
 
     // Declare OpMode members.
     private PCMSRoboticsDrive drive;
     private DcMotorEx launcher = null;
-    private Servo flylight = null;
+    private DcMotor intake = null;
+    private CRServo leftIntakeServo = null;
+    private CRServo rightIntakeServo = null;
+    private CRServo windmillServo = null;
 
-    ElapsedTime feederTimer = new ElapsedTime();
+    double intakePower;
     double oldTime = 0;
-
-    private enum LaunchState {
-        IDLE,
-        SPIN_UP,
-        LAUNCH,
-        LAUNCHING
-    }
-
-    private LaunchState launchState;
-
-    boolean isLongShot = false;
-
-    // --- TELEMETRY VARIABLES ---
-    double lastLaunchVelocity = 0.0;
-    int launchCount = 0;
 
     @Override
     public void init() {
-        launchState = LaunchState.IDLE;
-
         drive = new VanguardDrive(hardwareMap);
+
+        intake = hardwareMap.get(DcMotor.class, "intake");
         launcher = hardwareMap.get(DcMotorEx.class, "launcher");
+        windmillServo = hardwareMap.get(CRServo.class, "windmillServo");
+        leftIntakeServo = hardwareMap.get(CRServo.class, "left_intake_servo");
+        rightIntakeServo = hardwareMap.get(CRServo.class, "right_intake_servo");
+
+        intake.setZeroPowerBehavior(BRAKE);
 
         launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        launcher.setZeroPowerBehavior(BRAKE);
-        launcher.setZeroPowerBehavior(BRAKE);
+        launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(40, 0, 0, 12.5));
 
-        launcher.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, new PIDFCoefficients(300, 0, 0, 10));
+        leftIntakeServo.setPower(0);
+        rightIntakeServo.setPower(0);
+        windmillServo.setPower(0);
 
-//        flylight = hardwareMap.get(Servo.class, "flylight");
+        rightIntakeServo.setDirection(DcMotorSimple.Direction.REVERSE);
+        windmillServo.setDirection(DcMotorSimple.Direction.REVERSE);
 
         telemetry.addData("Status", "Initialized");
+        telemetry.update();
     }
 
     @Override
@@ -91,51 +73,37 @@ public class VanguardTeleopBioBuzz extends OpMode {
     @Override
     public void loop() {
         float stickLX, stickLY, stickRX;
-        drive.update();
-
-        if (gamepad1.a) {
-            drive.resetPosAndIMU();
-        }
-
-        double newTime = getRuntime();
-        double loopTime = newTime - oldTime;
-        double frequency = (loopTime > 0) ? (1 / loopTime) : 0;
-        oldTime = newTime;
+        boolean arrived = false;
 
         // Implement a deadband area for stick centering
         stickLX = (Math.abs(gamepad1.left_stick_x) < DEADBAND) ? 0 : gamepad1.left_stick_x;
         stickLY = (Math.abs(gamepad1.left_stick_y) < DEADBAND) ? 0 : gamepad1.left_stick_y;
         stickRX = (Math.abs(gamepad1.right_stick_x) < DEADBAND) ? 0 : gamepad1.right_stick_x;
 
-        if (gamepad1.dpad_down) {
-            drive.driveToLocation(0, 0, 0);
-        } else if (gamepad1.left_trigger_pressed) {
-            drive.mecanumDrive(-stickLY, stickLX, stickRX);
-        } else if (gamepad1.dpad_up) {
-            drive.driveToLocation(SHOOTING_X, SHOOTING_Y, SHOOTING_HEAD);
-        } else if (gamepad1.dpad_right) {
-            drive.driveToLocation(PARKING_X, PARKING_Y, PARKING_HEAD);
-        } else if (gamepad1.dpad_left) {
-            drive.driveToLocation(2751, 1306, 180);
-        } else {
+        // Drive controls
+        if (gamepad1.dpad_up) {
+            arrived = drive.driveToLocation(0, 0, 0);
+        } else if (gamepad1.left_bumper) {
             drive.mecanumDriveField(-stickLY, stickLX, stickRX);
+        } else {
+            drive.mecanumDrive(-stickLY, stickLX, stickRX);
         }
 
-        if (gamepad1.y) {
-            isLongShot = false;
-            launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-            //  flylight.setPosition(0.3);
-        } else if (gamepad1.b) {
-            launcher.setVelocity(STOP_SPEED);
-            //  flylight.setPosition(0.5);
-        } else if (gamepad1.x) {
-            isLongShot = true;
-            //  flylight.setPosition(0.3);
-            launcher.setVelocity(LAUNCHER_TARGET_VELOCITY_LONGSHOT);
+        // Position reset
+        if (gamepad1.a) {
+            drive.resetPosAndIMU();
         }
 
-        launch(gamepad1.rightBumperWasPressed());
+        // Intake and launch controls
+        // Intake power calculation from triggers
+        intakePower = gamepad1.right_trigger - gamepad1.left_trigger;
+        // Apply intake power to intake motor and servos
+        intake.setPower(intakePower);
+        leftIntakeServo.setPower(-intakePower);
+        rightIntakeServo.setPower(-intakePower);
 
+        launch();
+        drive.update();
         // --- TELEMETRY SECTION ---
         GoBildaPinpointDriver odo = drive.getOdo();
         if (odo != null) {
@@ -146,15 +114,10 @@ public class VanguardTeleopBioBuzz extends OpMode {
             telemetry.addData("Position", posData);
             telemetry.addData("Velocity", velData);
             telemetry.addData("Distance to Origin", String.format(Locale.US, "%.1f mm", Math.hypot(pos.getX(DistanceUnit.MM), pos.getY(DistanceUnit.MM))));
-            telemetry.addData("Drive to Origin", gamepad1.dpad_down ? "ACTIVE (Dpad Down)" : "Inactive");
             telemetry.addData("Pinpoint Status", odo.getDeviceStatus());
-            telemetry.addData("Pinpoint Frequency", odo.getFrequency());
+            telemetry.addData("Arrived:", arrived);
         }
-        telemetry.addData("REV Hub Frequency", frequency);
-        telemetry.addData("State", launchState);
-        telemetry.addData("Current Velocity", launcher.getVelocity());
-        telemetry.addData("Last Launch Velocity", lastLaunchVelocity);
-        telemetry.addData("Total Launches", launchCount);
+        telemetry.addData("Launcher Velocity", launcher.getVelocity());
         telemetry.update();
     }
 
@@ -162,39 +125,19 @@ public class VanguardTeleopBioBuzz extends OpMode {
     public void stop() {
     }
 
-    void spin() {
-        drive.mecanumDriveField(0, 0, .1);
-    }
+    void launch() {
+        if (gamepad1.right_bumper) {
+            launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
+        } else {
+            launcher.setVelocity(0);
+        }
 
-    void launch(boolean shotRequested) {
-        switch (launchState) {
-            case IDLE:
-                if (shotRequested) {
-                    launchState = LaunchState.SPIN_UP;
-                }
-                break;
-            case SPIN_UP:
-                if (!isLongShot) {
-                    launcher.setVelocity(LAUNCHER_TARGET_VELOCITY);
-                    if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
-                        launchState = LaunchState.LAUNCH;
-                    }
-                } else {
-                    launcher.setVelocity(LAUNCHER_TARGET_VELOCITY_LONGSHOT);
-                    if (launcher.getVelocity() > LAUNCHER_MIN_VELOCITY_LONGSHOT) {
-                        launchState = LaunchState.LAUNCH;
-                    }
-                }
-                break;
-            case LAUNCH:
-                feederTimer.reset();
-                launchState = LaunchState.LAUNCHING;
-                break;
-            case LAUNCHING:
-                if (feederTimer.seconds() > FEED_TIME_SECONDS) {
-                    launchState = LaunchState.IDLE;
-                }
-                break;
+        if (gamepad1.right_bumper && launcher.getVelocity() > LAUNCHER_MIN_VELOCITY) {
+            windmillServo.setPower(1);
+        } else if (gamepad1.dpad_down) {
+            windmillServo.setPower(-1);
+        } else {
+            windmillServo.setPower(0);
         }
     }
 }
