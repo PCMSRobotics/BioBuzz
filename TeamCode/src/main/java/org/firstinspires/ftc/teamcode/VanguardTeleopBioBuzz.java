@@ -10,6 +10,8 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
+import com.acmerobotics.dashboard.config.Config;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
@@ -17,13 +19,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit
 
 import java.util.Locale;
 
+@Config
 @TeleOp(name = "VanguardTeleopBioBuzz", group = "StarterBot")
 public class VanguardTeleopBioBuzz extends OpMode {
 
-    // Launcher constants from reference starterbot
-    public final int LAUNCHER_TARGET_VELOCITY = 1300;
-    public final int LAUNCHER_MIN_VELOCITY = 1200;
-    final double DEADBAND = 0.1;
+    // Launcher constants from reference starterbot - exposed to dashboard / panels via @Config
+    public static double LAUNCHER_TARGET_VELOCITY = 1300;
+    public static double LAUNCHER_MIN_VELOCITY = 1200;
+    public static double CONTROLLER_DEADBAND = 0.1;
 
     // Declare OpMode members.
     private PCMSRoboticsDrive drive;
@@ -76,9 +79,9 @@ public class VanguardTeleopBioBuzz extends OpMode {
         boolean arrived = false;
 
         // Implement a deadband area for stick centering
-        stickLX = (Math.abs(gamepad1.left_stick_x) < DEADBAND) ? 0 : gamepad1.left_stick_x;
-        stickLY = (Math.abs(gamepad1.left_stick_y) < DEADBAND) ? 0 : gamepad1.left_stick_y;
-        stickRX = (Math.abs(gamepad1.right_stick_x) < DEADBAND) ? 0 : gamepad1.right_stick_x;
+        stickLX = (Math.abs(gamepad1.left_stick_x) < CONTROLLER_DEADBAND) ? 0 : gamepad1.left_stick_x;
+        stickLY = (Math.abs(gamepad1.left_stick_y) < CONTROLLER_DEADBAND) ? 0 : gamepad1.left_stick_y;
+        stickRX = (Math.abs(gamepad1.right_stick_x) < CONTROLLER_DEADBAND) ? 0 : gamepad1.right_stick_x;
 
         // Drive controls
         if (gamepad1.dpad_up) {

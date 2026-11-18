@@ -1,5 +1,9 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.canvas.Canvas;
+import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.Range;
@@ -15,9 +19,10 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
  * Robot-specific implementations (such as VanguardDrive) can extend this class
  * and override motor or odometer initialization as needed.
  */
+@Config
 public class PCMSRoboticsDrive {
-    public static final double ORIGIN_DEADBAND_MM = 3.0;
-    public static final double ORIGIN_HEADING_DEADBAND_RAD = Math.toRadians(3.0);
+    public static double ORIGIN_DEADBAND_MM = 3.0;
+    public static double ORIGIN_HEADING_DEADBAND_RAD = Math.toRadians(3.0);
 
     protected DcMotor leftFrontDrive;
     protected DcMotor rightFrontDrive;
@@ -69,7 +74,56 @@ public class PCMSRoboticsDrive {
     public void update() {
         if (odo != null) {
             odo.update();
+            drawFieldOverlay(0, 0);
         }
+    }
+
+    private long lastDashboardDrawNanos = 0;
+    private static final long DASHBOARD_DRAW_INTERVAL_NANOS = 50_000_000L; // 50ms = 20 FPS refresh limit
+
+    /**
+     * Renders the robot position, heading vector, and target destination on FTC Dashboard 2D Field View.
+     * Throttled to 20 FPS (50ms) to ensure zero impact on main control loop frequency.
+     */
+    public void drawFieldOverlay(double targetX_MM, double targetY_MM) {
+        if (odo == null) return;
+
+        long now = System.nanoTime();
+        if (now - lastDashboardDrawNanos < DASHBOARD_DRAW_INTERVAL_NANOS) {
+            return;
+        }
+        lastDashboardDrawNanos = now;
+
+        FtcDashboard dashboard = FtcDashboard.getInstance();
+        TelemetryPacket packet = new TelemetryPacket();
+        Canvas fieldOverlay = packet.fieldOverlay();
+
+        // Convert MM to Inches for FTC Dashboard Canvas (144 in x 144 in field)
+        final double MM_TO_INCH = 0.0393701;
+        Pose2D pos = odo.getPosition();
+        double robotX_in = pos.getX(DistanceUnit.MM) * MM_TO_INCH;
+        double robotY_in = pos.getY(DistanceUnit.MM) * MM_TO_INCH;
+        double headingRad = pos.getHeading(AngleUnit.RADIANS);
+
+        // Draw robot body (circle with 9 inch radius = 18 inch diameter robot)
+        fieldOverlay.setStroke("#3F51B5"); // Blue robot outline
+        fieldOverlay.strokeCircle(robotX_in, robotY_in, 9.0);
+
+        // Draw robot heading direction line
+        double lineX = robotX_in + 12.0 * Math.cos(headingRad);
+        double lineY = robotY_in + 12.0 * Math.sin(headingRad);
+        fieldOverlay.strokeLine(robotX_in, robotY_in, lineX, lineY);
+
+        // Draw target location if active
+        if (targetX_MM != 0 || targetY_MM != 0) {
+            double targetX_in = targetX_MM * MM_TO_INCH;
+            double targetY_in = targetY_MM * MM_TO_INCH;
+            fieldOverlay.setStroke("#FF5722"); // Orange target line and circle
+            fieldOverlay.strokeCircle(targetX_in, targetY_in, 4.0);
+            fieldOverlay.strokeLine(robotX_in, robotY_in, targetX_in, targetY_in);
+        }
+
+        dashboard.sendTelemetryPacket(packet);
     }
 
     public void mecanumDrive(double forward, double strafe, double rotate) {
@@ -99,24 +153,27 @@ public class PCMSRoboticsDrive {
         mecanumDrive(rotForward, rotStrafe, rotate);
     }
 
-    // ---- Tuning values for driveToLocation (change these while testing) ----
-    // kP: "how hard to push per unit of error". Bigger = faster approach, but too big overshoots.
-    private static final double DRIVE_KP = 0.002;       // motor power per mm of distance left
-    private static final double TURN_KP = 1.5;          // motor power per radian of angle left
-    // kD: "brake in proportion to speed". Bigger = softer landing, too big = sluggish.
-    private static final double DRIVE_KD = 0.0002;      // power removed per mm/sec of speed
-    private static final double TURN_KD = 0.1;          // power removed per radian/sec of spin
-    // kS: the smallest power that actually makes the robot move (it must beat friction).
-    private static final double DRIVE_KS = 0.10;
-    private static final double TURN_KS = 0.08;
-    private static final double MAX_DRIVE_POWER = 0.5;
-    private static final double MAX_TURN_POWER = 0.4;
-    // Most the command may change per loop, so the robot ramps instead of lurching.
-    private static final double MAX_POWER_CHANGE_PER_LOOP = 0.1;
-    // Must be "close enough" this many loops in a row before we say "arrived".
-    private static final int SETTLE_LOOPS = 5;
-    // If driveToLocation was not called for this long, start fresh (new move).
-    private static final long STALE_NANOS = 200_000_000L;
+    // ---- Tuning values for driveToLocation grouped into PDController category on Dashboard ----
+    @Config
+    public static class PDController {
+        // kP: "how hard to push per unit of error". Bigger = faster approach, but too big overshoots.
+        public static double DRIVE_KP = 0.002;       // motor power per mm of distance left
+        public static double TURN_KP = 1.5;          // motor power per radian of angle left
+        // kD: "brake in proportion to speed". Bigger = softer landing, too big = sluggish.
+        public static double DRIVE_KD = 0.0005;      // power removed per mm/sec of speed
+        public static double TURN_KD = 0.01;          // power removed per radian/sec of spin
+        // kS: the smallest power that actually makes the robot move (it must beat friction).
+        public static double DRIVE_KS = 0.05;
+        public static double TURN_KS = 0.08;
+        public static double MAX_DRIVE_POWER = 1.0;
+        public static double MAX_TURN_POWER = 0.5;
+        // Most the command may change per loop, so the robot ramps instead of lurching.
+        public static double MAX_POWER_CHANGE_PER_LOOP = 0.1;
+        // Must be "close enough" this many loops in a row before we say "arrived".
+        public static int SETTLE_LOOPS = 3;
+        // If driveToLocation was not called for this long, start fresh (new move).
+        public static long STALE_NANOS = 200_000_000L;
+    }
 
     private double lastDestX, lastDestY, lastDestHeadDeg;
     private double lastForward, lastStrafe, lastRotate;
@@ -126,12 +183,12 @@ public class PCMSRoboticsDrive {
 
     /**
      * PD controller with a minimum power:
-     *   power = kP * error  -  kD * speed
-     *   - kP * error pushes toward the target (far away = push hard, close = push gently).
-     *   - kD * speed is a brake: the faster we are moving, the more we ease off,
-     *     so we slow down BEFORE reaching the target instead of flying past it.
-     *   - If the result is too weak to overcome friction (below kS) while we are still
-     *     pushing the right way, we bump it up to kS so the robot doesn't stall short.
+     * power = kP * error  -  kD * speed
+     * - kP * error pushes toward the target (far away = push hard, close = push gently).
+     * - kD * speed is a brake: the faster we are moving, the more we ease off,
+     * so we slow down BEFORE reaching the target instead of flying past it.
+     * - If the result is too weak to overcome friction (below kS) while we are still
+     * pushing the right way, we bump it up to kS so the robot doesn't stall short.
      */
     private double pdWithMinPower(double error, double speed, double kP, double kD, double kS, double maxPower) {
         double power = kP * error - kD * speed;
@@ -142,20 +199,23 @@ public class PCMSRoboticsDrive {
         return Range.clip(power, -maxPower, maxPower);
     }
 
-    /** Moves current toward wanted by at most maxStep (a "speed limit" on how fast power changes). */
+    /**
+     * Moves current toward wanted by at most maxStep (a "speed limit" on how fast power changes).
+     */
     private double slew(double current, double wanted, double maxStep) {
         return current + Range.clip(wanted - current, -maxStep, maxStep);
     }
 
     public boolean driveToLocation(double destX, double destY, double destHeadDeg) {
         update();
+        drawFieldOverlay(destX, destY);
         if (odo == null) return true;
 
         // Start fresh if this is a new target or it has been a while since we were called.
         long now = System.nanoTime();
         boolean newMove = !hasLastTarget
                 || destX != lastDestX || destY != lastDestY || destHeadDeg != lastDestHeadDeg
-                || now - lastCallNanos > STALE_NANOS;
+                || now - lastCallNanos > PDController.STALE_NANOS;
         if (newMove) {
             settledLoops = 0;
             lastForward = 0;
@@ -201,25 +261,25 @@ public class PCMSRoboticsDrive {
         double wantRotate = 0.0;
 
         if (!atPosition) {
-            wantForward = pdWithMinPower(errorX, velX, DRIVE_KP, DRIVE_KD, DRIVE_KS, MAX_DRIVE_POWER);
-            wantStrafe = pdWithMinPower(errorY, velY, DRIVE_KP, DRIVE_KD, DRIVE_KS, MAX_DRIVE_POWER);
+            wantForward = pdWithMinPower(errorX, velX, PDController.DRIVE_KP, PDController.DRIVE_KD, PDController.DRIVE_KS, PDController.MAX_DRIVE_POWER);
+            wantStrafe = pdWithMinPower(errorY, velY, PDController.DRIVE_KP, PDController.DRIVE_KD, PDController.DRIVE_KS, PDController.MAX_DRIVE_POWER);
         }
         if (!atHeading) {
-            wantRotate = pdWithMinPower(headingError, velHeading, TURN_KP, TURN_KD, TURN_KS, MAX_TURN_POWER);
+            wantRotate = pdWithMinPower(headingError, velHeading, PDController.TURN_KP, PDController.TURN_KD, PDController.TURN_KS, PDController.MAX_TURN_POWER);
         }
 
         // Ramp the commands so power changes smoothly. Stopping (all zeros) is always allowed instantly.
         boolean stopping = atPosition && atHeading;
-        lastForward = stopping ? 0 : slew(lastForward, wantForward, MAX_POWER_CHANGE_PER_LOOP);
-        lastStrafe = stopping ? 0 : slew(lastStrafe, wantStrafe, MAX_POWER_CHANGE_PER_LOOP);
-        lastRotate = stopping ? 0 : slew(lastRotate, wantRotate, MAX_POWER_CHANGE_PER_LOOP);
+        lastForward = stopping ? 0 : slew(lastForward, wantForward, PDController.MAX_POWER_CHANGE_PER_LOOP);
+        lastStrafe = stopping ? 0 : slew(lastStrafe, wantStrafe, PDController.MAX_POWER_CHANGE_PER_LOOP);
+        lastRotate = stopping ? 0 : slew(lastRotate, wantRotate, PDController.MAX_POWER_CHANGE_PER_LOOP);
 
         fieldDrive(lastForward, -lastStrafe, -lastRotate, currentHeadingRad);
 
         // Only report "arrived" after being close enough for several loops in a row,
         // so one lucky noisy reading while still moving doesn't count.
         settledLoops = stopping ? settledLoops + 1 : 0;
-        return settledLoops >= SETTLE_LOOPS;
+        return settledLoops >= PDController.SETTLE_LOOPS;
     }
 
     public boolean driveToLocation(Pose2D targetPose) {
